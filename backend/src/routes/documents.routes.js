@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const { randomUUID } = require('crypto');
 const express = require('express');
@@ -8,6 +9,15 @@ const { createDocumentsService } = require('../services/documents.service');
 
 const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024;
 const DEFAULT_STORAGE_PATH = path.resolve(__dirname, '../../storage');
+const ALLOWED_FILE_EXTENSIONS = new Set([
+  '.pdf',
+  '.txt',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+]);
 
 function getMaxFileSize() {
   const configuredSize = Number.parseInt(process.env.MAX_FILE_SIZE, 10);
@@ -17,29 +27,56 @@ function getMaxFileSize() {
 }
 
 function isAllowedMimeType(mimeType) {
+  if (typeof mimeType !== 'string') {
+    return false;
+  }
+
   return mimeType === 'application/pdf'
     || mimeType === 'text/plain'
     || mimeType.startsWith('image/');
 }
 
+function isAllowedFileExtension(fileName) {
+  return ALLOWED_FILE_EXTENSIONS.has(path.extname(fileName || '').toLowerCase());
+}
+
+function resolveStoragePath(storagePath) {
+  const resolvedStoragePath = path.resolve(storagePath || DEFAULT_STORAGE_PATH);
+  const relativePath = path.relative(DEFAULT_STORAGE_PATH, resolvedStoragePath);
+  const isInsideDefaultStorage = relativePath === ''
+    || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath));
+
+  if (!isInsideDefaultStorage) {
+    const error = new Error('O diretório de armazenamento deve ficar dentro de backend/storage.');
+    error.code = 'INVALID_STORAGE_PATH';
+    throw error;
+  }
+
+  return resolvedStoragePath;
+}
+
 function createDocumentsRouter({
   storagePath = process.env.STORAGE_PATH || DEFAULT_STORAGE_PATH,
-  documentsRepository = createDocumentsRepository(storagePath),
+  documentsRepository,
 } = {}) {
+  const resolvedStoragePath = resolveStoragePath(storagePath);
+  fs.mkdirSync(resolvedStoragePath, { recursive: true });
+
   const router = express.Router();
-  const documentsService = createDocumentsService(documentsRepository);
-  const documentsController = createDocumentsController(documentsService);
-  const storage = multer.diskStorage({
-    destination: storagePath,
-    filename: (req, file, callback) => {
-      callback(null, `${randomUUID()}${path.extname(file.originalname)}`);
-    },
-  });
+  const repository = documentsRepository || createDocumentsRepository(resolvedStoragePath);
   const upload = multer({
-    storage,
+    storage: multer.diskStorage({
+      destination: resolvedStoragePath,
+      filename: (req, file, callback) => {
+        callback(null, `${randomUUID()}${path.extname(file.originalname)}`);
+      },
+    }),
     limits: { fileSize: getMaxFileSize(), files: 1 },
     fileFilter: (req, file, callback) => {
-      if (isAllowedMimeType(file.mimetype)) {
+      const isAllowed = isAllowedMimeType(file.mimetype)
+        && isAllowedFileExtension(file.originalname);
+
+      if (isAllowed) {
         return callback(null, true);
       }
 
@@ -48,6 +85,8 @@ function createDocumentsRouter({
       return callback(error);
     },
   });
+  const documentsService = createDocumentsService(repository);
+  const documentsController = createDocumentsController(documentsService);
 
   router.post('/upload', upload.single('file'), documentsController.upload);
   router.get('/documents', documentsController.list);
@@ -70,6 +109,13 @@ function createDocumentsRouter({
 
     if (error.code === 'UNSUPPORTED_MEDIA_TYPE') {
       return res.status(415).json({
+        error: error.code,
+        message: error.message,
+      });
+    }
+
+    if (error.code === 'INVALID_STORAGE_PATH') {
+      return res.status(500).json({
         error: error.code,
         message: error.message,
       });

@@ -24,10 +24,10 @@ function createDocumentsService(documentsRepository) {
     return documentsRepository.findAll().map(toPublicMetadata);
   }
 
-  function getDocumentForDownload(id) {
+  async function getDocumentForDownload(id) {
     const document = documentsRepository.findById(id);
 
-    if (!document || !documentsRepository.fileExists(document)) {
+    if (!document || !(await documentsRepository.fileExists(document))) {
       const error = new Error('Documento não encontrado.');
       error.code = 'DOCUMENT_NOT_FOUND';
       throw error;

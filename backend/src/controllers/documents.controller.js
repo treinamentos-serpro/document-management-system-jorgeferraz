@@ -1,41 +1,37 @@
 function createDocumentsController(documentsService) {
-  function upload(req, res, next) {
-    try {
-      if (!req.file) {
-        return res.status(400).json({
-          error: 'VALIDATION_ERROR',
-          message: 'É necessário enviar um arquivo no campo file.',
-        });
-      }
-
-      return res.status(201).json(documentsService.createDocument(req.file));
-    } catch (error) {
-      return next(error);
-    }
+  function withErrorHandling(handler) {
+    return function controllerHandler(req, res, next) {
+      Promise.resolve()
+        .then(() => handler(req, res, next))
+        .catch(next);
+    };
   }
 
-  function list(req, res, next) {
-    try {
-      return res.status(200).json(documentsService.listDocuments());
-    } catch (error) {
-      return next(error);
-    }
-  }
-
-  function download(req, res, next) {
-    try {
-      const document = documentsService.getDocumentForDownload(req.params.id);
-      res.type(document.mimeType);
-
-      return res.download(document.filePath, document.originalName, (error) => {
-        if (error && !res.headersSent) {
-          next(error);
-        }
+  const upload = withErrorHandling((req, res) => {
+    if (!req.file) {
+      return res.status(400).json({
+        error: 'VALIDATION_ERROR',
+        message: 'É necessário enviar um arquivo no campo file.',
       });
-    } catch (error) {
-      return next(error);
     }
-  }
+
+    return res.status(201).json(documentsService.createDocument(req.file));
+  });
+
+  const list = withErrorHandling((req, res) => {
+    return res.status(200).json(documentsService.listDocuments());
+  });
+
+  const download = withErrorHandling(async (req, res, next) => {
+    const document = await documentsService.getDocumentForDownload(req.params.id);
+    res.type(document.mimeType);
+
+    return res.download(document.filePath, document.originalName, (error) => {
+      if (error && !res.headersSent) {
+        next(error);
+      }
+    });
+  });
 
   return {
     upload,

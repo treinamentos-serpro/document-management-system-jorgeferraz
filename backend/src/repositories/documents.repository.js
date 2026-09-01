@@ -21,8 +21,13 @@ function createDocumentsRepository(storagePath) {
     return path.join(storagePath, document.storedName);
   }
 
-  function fileExists(document) {
-    return fs.existsSync(getFilePath(document));
+  async function fileExists(document) {
+    try {
+      await fs.promises.access(getFilePath(document), fs.constants.F_OK);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   return {
