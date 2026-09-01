@@ -1,20 +1,54 @@
-// Seed do componente raiz do Document Management System.
-//
-// Este é apenas um ponto de partida mínimo. Durante o Passo 3 você vai usar o
-// Agent Mode do GitHub Copilot para construir os componentes:
-//   - components/UploadComponent
-//   - components/DocumentList
-//   - components/DownloadButton
-// e o serviço services/ que consome a API do backend via fetch.
+import { useEffect, useState } from 'react';
+import DocumentList from './components/DocumentList.jsx';
+import UploadComponent from './components/UploadComponent.jsx';
+import { listDocuments, uploadDocument } from './services/documentsApi.js';
 
 export default function App() {
+  const [documents, setDocuments] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [listError, setListError] = useState('');
+
+  async function loadDocuments() {
+    setIsLoading(true);
+    setListError('');
+
+    try {
+      setDocuments(await listDocuments());
+    } catch (error) {
+      setListError(error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadDocuments();
+  }, []);
+
+  async function handleUpload(file) {
+    const document = await uploadDocument(file);
+    setDocuments((currentDocuments) => [...currentDocuments, document]);
+  }
+
   return (
-    <main style={{ fontFamily: 'system-ui, sans-serif', padding: '2rem' }}>
-      <h1>Document Management System</h1>
-      <p>
-        Seed do frontend. Construa a interface durante o Passo 3 usando o Agent
-        Mode do GitHub Copilot.
-      </p>
+    <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:py-16">
+      <header className="mb-10 border-b border-slate-300 pb-6">
+        <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-teal-700">
+          Gestão de arquivos
+        </p>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+          Document Management System
+        </h1>
+      </header>
+      <div className="space-y-8">
+        <UploadComponent onUpload={handleUpload} />
+        <DocumentList
+          documents={documents}
+          isLoading={isLoading}
+          error={listError}
+          onRetry={loadDocuments}
+        />
+      </div>
     </main>
   );
 }
