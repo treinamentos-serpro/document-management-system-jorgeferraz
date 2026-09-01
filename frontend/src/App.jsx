@@ -31,15 +31,24 @@ export default function App() {
   }
 
   return (
-    <main>
-      <h1>Document Management System</h1>
-      <UploadComponent onUpload={handleUpload} />
-      <DocumentList
-        documents={documents}
-        isLoading={isLoading}
-        error={listError}
-        onRetry={loadDocuments}
-      />
+    <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:py-16">
+      <header className="mb-10 border-b border-slate-300 pb-6">
+        <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-teal-700">
+          Gestão de arquivos
+        </p>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+          Document Management System
+        </h1>
+      </header>
+      <div className="space-y-8">
+        <UploadComponent onUpload={handleUpload} />
+        <DocumentList
+          documents={documents}
+          isLoading={isLoading}
+          error={listError}
+          onRetry={loadDocuments}
+        />
+      </div>
     </main>
   );
 }
