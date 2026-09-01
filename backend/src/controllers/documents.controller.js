@@ -1,7 +1,7 @@
 function createDocumentsController(documentsService) {
   function withErrorHandling(handler) {
     return function controllerHandler(req, res, next) {
-      Promise.resolve()
+      return Promise.resolve()
         .then(() => handler(req, res, next))
         .catch(next);
     };

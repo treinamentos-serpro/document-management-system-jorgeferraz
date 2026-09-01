@@ -1,7 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 
+function resolveStoragePath(storagePath) {
+  const resolvedStoragePath = path.resolve(storagePath || path.resolve(__dirname, '../../storage'));
+  fs.mkdirSync(resolvedStoragePath, { recursive: true });
+  return resolvedStoragePath;
+}
+
 function createDocumentsRepository(storagePath) {
+  const resolvedStoragePath = resolveStoragePath(storagePath);
   const documents = new Map();
 
   function create(document) {
@@ -18,7 +25,11 @@ function createDocumentsRepository(storagePath) {
   }
 
   function getFilePath(document) {
-    return path.join(storagePath, document.storedName);
+    return path.join(resolvedStoragePath, document.storedName);
+  }
+
+  function getStoragePath() {
+    return resolvedStoragePath;
   }
 
   async function fileExists(document) {
@@ -35,6 +46,7 @@ function createDocumentsRepository(storagePath) {
     findAll,
     findById,
     getFilePath,
+    getStoragePath,
     fileExists,
   };
 }

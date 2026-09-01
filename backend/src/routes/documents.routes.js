@@ -1,4 +1,3 @@
-const fs = require('fs');
 const path = require('path');
 const { randomUUID } = require('crypto');
 const express = require('express');
@@ -40,33 +39,21 @@ function isAllowedFileExtension(fileName) {
   return ALLOWED_FILE_EXTENSIONS.has(path.extname(fileName || '').toLowerCase());
 }
 
-function resolveStoragePath(storagePath) {
-  const resolvedStoragePath = path.resolve(storagePath || DEFAULT_STORAGE_PATH);
-  const relativePath = path.relative(DEFAULT_STORAGE_PATH, resolvedStoragePath);
-  const isInsideDefaultStorage = relativePath === ''
-    || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath));
-
-  if (!isInsideDefaultStorage) {
-    const error = new Error('O diretório de armazenamento deve ficar dentro de backend/storage.');
-    error.code = 'INVALID_STORAGE_PATH';
-    throw error;
-  }
-
-  return resolvedStoragePath;
-}
-
 function createDocumentsRouter({
   storagePath = process.env.STORAGE_PATH || DEFAULT_STORAGE_PATH,
   documentsRepository,
 } = {}) {
-  const resolvedStoragePath = resolveStoragePath(storagePath);
-  fs.mkdirSync(resolvedStoragePath, { recursive: true });
-
   const router = express.Router();
-  const repository = documentsRepository || createDocumentsRepository(resolvedStoragePath);
+  const repository = documentsRepository || createDocumentsRepository(storagePath);
+
+  if (typeof repository.getStoragePath !== 'function') {
+    throw new Error('O repositório de documentos deve implementar getStoragePath.');
+  }
+
+  const uploadDestination = repository.getStoragePath();
   const upload = multer({
     storage: multer.diskStorage({
-      destination: resolvedStoragePath,
+      destination: uploadDestination,
       filename: (req, file, callback) => {
         callback(null, `${randomUUID()}${path.extname(file.originalname)}`);
       },
@@ -109,13 +96,6 @@ function createDocumentsRouter({
 
     if (error.code === 'UNSUPPORTED_MEDIA_TYPE') {
       return res.status(415).json({
-        error: error.code,
-        message: error.message,
-      });
-    }
-
-    if (error.code === 'INVALID_STORAGE_PATH') {
-      return res.status(500).json({
         error: error.code,
         message: error.message,
       });
